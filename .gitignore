@@ -1,11 +1,43 @@
+# ---- Python ----
 __pycache__/
-.venv/
 *.pyc
+*.pyo
+*.pyd
 *.pkl
 *.db
-face_recon.db
-/models/
+*.sqlite3
+*.log
+
+# ---- Virtual Environment ----
+.venv/
+env/
+venv/
+
+# ---- Environment & Config ----
 .env
 .DS_Store
 .vscode/
 .idea/
+*.code-workspace
+
+# ---- Models & Data ----
+models/data/enroll/
+models/data/*.pkl
+models/*.pkl
+face_recon.db
+
+# ---- Build / Distribution ----
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---- OS Files ----
+Thumbs.db
+desktop.ini
+
+# ---- Misc ----
+# Ignore cache, temporary, or test outputs
+.cache/
+tmp/
+test_output/
