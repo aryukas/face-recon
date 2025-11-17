@@ -4,39 +4,48 @@ import faiss
 
 class FaceMatcher:
     """
-    Lightweight FAISS-based face matcher.
-    Stores embeddings + person info and performs fast similarity search.
+    FAISS-based face matcher with correct normalization and
+    improved matching thresholds for FaceNet embeddings.
     """
 
-    def __init__(self, embedding_dim: int = 512):
+    def __init__(self, embedding_dim: int = 512, use_cosine: bool = True):
         self.embedding_dim = embedding_dim
+        self.use_cosine = use_cosine
 
-        # Create FAISS index for L2 similarity
-        self.index = faiss.IndexFlatL2(self.embedding_dim)
+        # Cosine = normalized vectors + Inner Product
+        if use_cosine:
+            self.index = faiss.IndexFlatIP(embedding_dim)
+        else:
+            self.index = faiss.IndexFlatL2(embedding_dim)
 
-        # Store metadata (person_id + filename)
-        self.labels = []
+        self.labels = []   # stores metadata
 
-    def _prepare(self, emb: np.ndarray):
-        """
-        Ensure correct shape and dtype.
-        """
+    # -------------------------------------------------------------
+    # Helper to prepare an embedding (reshape + normalize)
+    # -------------------------------------------------------------
+    def _prepare(self, emb: np.ndarray) -> np.ndarray:
         emb = np.asarray(emb, dtype=np.float32)
 
+        # Ensure 2D
         if emb.ndim == 1:
             emb = emb.reshape(1, -1)
 
+        # Validate dimension
         if emb.shape[1] != self.embedding_dim:
             raise ValueError(
-                f"Embedding size mismatch: Expected {self.embedding_dim}, got {emb.shape[1]}"
+                f"[FaceMatcher] Expected embedding size {self.embedding_dim}, got {emb.shape[1]}"
             )
+
+        # Normalize for cosine similarity
+        if self.use_cosine:
+            faiss.normalize_L2(emb)
 
         return emb
 
+    # -------------------------------------------------------------
+    # Add face embedding to FAISS database
+    # -------------------------------------------------------------
     def add_embedding(self, emb: np.ndarray, person_id: str, filename: str):
-        """
-        Add a new face embedding to FAISS index.
-        """
         emb = self._prepare(emb)
         self.index.add(emb)
 
@@ -45,23 +54,44 @@ class FaceMatcher:
             "filename": filename
         })
 
-    def match(self, emb: np.ndarray, threshold: float = 0.8):
+    # -------------------------------------------------------------
+    # Core match function
+    # -------------------------------------------------------------
+    def match(self, emb: np.ndarray, threshold: float = 0.75):
         """
-        Match an embedding against all stored embeddings.
+        Match a given face embedding against stored embeddings.
 
-        Returns:
-            (dict or None, float) → (Matched label, distance)
+        Cosine similarity mode:
+            similarity >= threshold → match
+
+        L2 mode:
+            distance <= threshold  → match
         """
         if len(self.labels) == 0:
             return None, None
 
         emb = self._prepare(emb)
-        distances, indices = self.index.search(emb, 1)
 
-        distance = float(distances[0][0])
-        idx = int(indices[0][0])
+        # Search for best match (top-1)
+        scores, idxs = self.index.search(emb, 1)
 
-        if distance < threshold:
-            return self.labels[idx], distance
+        score = float(scores[0][0])
+        idx = int(idxs[0][0])
 
-        return None, distance
+        # -----------------------------
+        # COSINE SIMILARITY MODE
+        # -----------------------------
+        if self.use_cosine:
+            # Typical FaceNet good matches: 0.75–0.90
+            if score >= threshold:
+                return self.labels[idx], score
+            return None, score
+
+        # -----------------------------
+        # EUCLIDEAN DISTANCE MODE
+        # -----------------------------
+        else:
+            # L2 good matches usually < 1.1
+            if score <= threshold:
+                return self.labels[idx], score
+            return None, score

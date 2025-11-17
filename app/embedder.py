@@ -6,20 +6,20 @@ from facenet_pytorch import MTCNN, InceptionResnetV1
 
 
 class FaceEmbedder:
-   
 
     def __init__(self, device: str = "cpu"):
         self.device = torch.device(device)
 
-        # Robust MTCNN (keeps model on CPU if GPU is unavailable)
+        # FIXED: pass device directly into MTCNN (do NOT use .to())
         self.mtcnn = MTCNN(
             image_size=160,
             margin=20,
             post_process=True,
-            keep_all=False
-        ).to(self.device)
+            keep_all=False,
+            device=self.device
+        )
 
-        # Pretrained FaceNet (VGGFace2, 512D output)
+        # FaceNet model
         self.model = InceptionResnetV1(
             pretrained="vggface2"
         ).eval().to(self.device)
@@ -54,7 +54,7 @@ class FaceEmbedder:
         with torch.no_grad():
             emb = self.model(aligned_face).cpu().numpy().reshape(-1)
 
-        # always return float32 (FAISS requirement)
+        # FAISS requires float32
         emb = emb.astype(np.float32)
 
         return emb

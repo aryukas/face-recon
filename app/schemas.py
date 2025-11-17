@@ -1,15 +1,25 @@
 from pydantic import BaseModel
+from typing import Optional, List
+
+
+class FaceBox(BaseModel):
+    x1: float
+    y1: float
+    x2: float
+    y2: float
 
 
 class FaceDetectResponse(BaseModel):
     status: str
-    faces_detected: int
+    count: int
+    boxes: Optional[List[List[float]]] = None
 
 
 class FaceMatchResponse(BaseModel):
     status: str
-    name: str | None = None
-    distance: float | None = None
+    person_id: Optional[str] = None
+    filename: Optional[str] = None
+    distance: Optional[float] = None
 
 
 class ErrorResponse(BaseModel):

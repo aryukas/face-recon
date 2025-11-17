@@ -5,8 +5,7 @@ import io
 
 def read_image_from_bytes(image_bytes: bytes) -> Image.Image:
     """
-    Convert raw image bytes into a Pillow Image.
-    Safely handles corrupted images.
+    Convert raw image bytes into a Pillow Image safely.
     """
     try:
         return Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -16,25 +15,24 @@ def read_image_from_bytes(image_bytes: bytes) -> Image.Image:
 
 def to_numpy(tensor):
     """
-    Convert a Torch tensor to NumPy safely.
-    Ensures CPU conversion and float32 dtype for consistency.
+    Convert tensor or list/array to float32 NumPy array.
     """
     if tensor is None:
         return None
 
-    # Torch tensor
+    # Torch tensor → numpy
     if hasattr(tensor, "detach"):
         arr = tensor.detach().cpu().numpy()
     else:
-        arr = np.array(tensor)
+        arr = np.asarray(tensor)
 
     return arr.astype(np.float32)
 
 
 def normalize_embedding(emb: np.ndarray) -> np.ndarray:
     """
-    Normalize embedding vector to unit length.
-    Prevents numerical instability and improves matching quality.
+    Normalize embedding to unit length.
+    Improves matching consistency.
     """
     if emb is None:
         return None
@@ -50,8 +48,7 @@ def normalize_embedding(emb: np.ndarray) -> np.ndarray:
 
 def euclidean_distance(a: np.ndarray, b: np.ndarray) -> float:
     """
-    Compute L2 (Euclidean) distance between two embeddings.
-    Safely handles invalid inputs.
+    Compute L2 distance between two embeddings.
     """
     if a is None or b is None:
         return float("inf")
@@ -64,8 +61,7 @@ def euclidean_distance(a: np.ndarray, b: np.ndarray) -> float:
 
 def resize_image(image: Image.Image, max_size: int = 800) -> Image.Image:
     """
-    Resize large images to reduce computation cost 
-    without affecting face detection accuracy.
+    Resize large images while keeping aspect ratio.
     """
     if image is None:
         return None
