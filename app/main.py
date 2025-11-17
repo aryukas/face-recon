@@ -1,52 +1,84 @@
 from fastapi import FastAPI, UploadFile, File
 from app.detector import FaceDetector
-from app.db import init_db
+from app.embedder import FaceEmbedder
+from app.matcher import FaceMatcher
+from app.db import init_db, get_all_faces
 
-# Initialize FastAPI application
+
 app = FastAPI(
     title="Face Recognition API",
-    version="1.0",
-    description="Simple and offline-ready face detection API using FastAPI and FaceNet.",
+    version="1.0.0",
+    description="Offline-ready Face Detection & Matching API using MTCNN + FaceNet",
 )
 
-# Initialize modules once on startup
+
 detector = FaceDetector()
+embedder = FaceEmbedder()
+matcher = FaceMatcher()
+
+# Initialize local DB storage
 init_db()
+
+# Load stored embeddings into FAISS
+saved_faces = get_all_faces()
+
+for item in saved_faces:
+    matcher.add_embedding(
+        emb=item["embedding"],
+        person_id=item["name"],
+        filename=item.get("filename", "database")
+    )
 
 
 @app.get("/")
 def home():
-    """Check API status."""
-    return {"message": "BSDK chalu hogaya"}
+    return {"message": "Face Recognition API is running !"}
 
 
 @app.post("/detect/")
 async def detect_face(file: UploadFile = File(...)):
     """
-    Detect faces from an uploaded image.
-
-    Args:
-        file: Image file (jpg/png/jpeg)
-
-    Returns:
-        JSON with total faces detected and operation status.
+    Detect face bounding boxes from an uploaded image.
     """
     try:
-        # Read the uploaded image as bytes
         image_bytes = await file.read()
-
-        # Detect faces using MTCNN
         boxes = detector.detect_faces(image_bytes)
 
-        # Build response
         return {
             "status": "success" if boxes else "no face detected",
-            "faces_detected": len(boxes) if boxes else 0
+            "count": len(boxes),
+            "boxes": boxes
         }
 
     except Exception as e:
-        # Graceful error handling
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/match/")
+async def match_face(file: UploadFile = File(...)):
+    """
+    Match uploaded face with database embeddings.
+    """
+    try:
+        image_bytes = await file.read()
+
+        # Extract embedding
+        embedding = detector.get_embedding(image_bytes)
+        if embedding is None:
+            return {"status": "no face detected"}
+
+        # Match with FAISS index
+        match, distance = matcher.match(embedding)
+
+        if match is None:
+            return {"status": "no match", "distance": distance}
+
         return {
-            "status": "error",
-            "message": f"Failed to process image: {str(e)}"
+            "status": "match",
+            "person_id": match["person_id"],
+            "filename": match["filename"],
+            "distance": distance,
         }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

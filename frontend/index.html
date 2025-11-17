@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Face Recognition</title>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background: #f2f2f2;
+        }
+        #camera {
+            width: 480px;
+            border-radius: 10px;
+            border: 2px solid #444;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+        }
+        #nameBox {
+            margin-top: 10px;
+            font-size: 26px;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+
+<h2>🔥 Real-Time Face Recognition</h2>
+
+<video id="camera" autoplay muted playsinline></video>
+
+<div id="status">⏳ Loading camera...</div>
+<div id="nameBox"></div>
+
+<script>
+    const video = document.getElementById("camera");
+    const statusBox = document.getElementById("status");
+    const nameBox = document.getElementById("nameBox");
+
+    async function startCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            statusBox.innerText = "📷 Camera active";
+            recognizeLoop();  
+        } catch (err) {
+            statusBox.innerText = "Camera blocked: " + err;
+        }
+    }
+
+    async function captureFrame() {
+        let canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        let ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0);
+
+        return new Promise(resolve => {
+            canvas.toBlob(blob => resolve(blob), "image/jpeg", 0.8);
+        });
+    }
+
+    async function recognizeLoop() {
+        setInterval(async () => {
+            let blob = await captureFrame();
+
+            let formData = new FormData();
+            formData.append("file", blob, "frame.jpg");
+
+            try {
+                let res = await fetch("http://127.0.0.1:8000/match/", {
+                    method: "POST",
+                    body: formData
+                });
+
+                let data = await res.json();
+
+                if (data.name) {
+                    nameBox.innerText = "✔ Recognized: " + data.name;
+                } else {
+                    nameBox.innerText = "❌ No match";
+                }
+
+            } catch (err) {
+                nameBox.innerText = "Error: " + err;
+            }
+        }, 500); // Capture every 0.5 seconds
+    }
+
+    startCamera();
+</script>
+
+</body>
+</html>
